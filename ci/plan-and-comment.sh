@@ -93,20 +93,34 @@ if [ -z "$PR_NUMBER" ]; then
 fi
 echo "resolved PR: #$PR_NUMBER"
 
-# --- build comment body (truncate defensively; GitHub caps at 65536) ----------
+# --- build comment body, Atlantis-style ---------------------------------------
+# (a) Colorize: GitHub only renders a ```diff line green/red when +/-/~ is the
+#     FIRST character. tofu indents those lines, so swap leading whitespace with
+#     the symbol (`      + x` -> `+      x`) — keeps indentation, gains color.
+DIFF_COLORED="$(printf '%s\n' "$PLAN_OUTPUT" | sed -E 's/^([[:space:]]*)([+~-])/\2\1/')"
+
+# Atlantis-style summary line (pull tofu's own line; fall back to our status).
+SUMMARY_LINE="$(printf '%s\n' "$PLAN_OUTPUT" | grep -E '^(Plan:|No changes|Apply complete|Error:)' | head -1)"
+[ -z "$SUMMARY_LINE" ] && SUMMARY_LINE="$PLAN_STATUS"
+
+HEADER="Ran Plan for dir: \`$TF_DIR\` workspace: \`default\`"
+
+# Truncate defensively (GitHub caps comments at 65536 chars).
 MAX=60000
-if [ "$(printf %s "$PLAN_OUTPUT" | wc -c)" -gt "$MAX" ]; then
-  PLAN_OUTPUT="$(printf %s "$PLAN_OUTPUT" | head -c "$MAX")
+if [ "$(printf %s "$DIFF_COLORED" | wc -c)" -gt "$MAX" ]; then
+  DIFF_COLORED="$(printf %s "$DIFF_COLORED" | head -c "$MAX")
 ... (output truncated)"
 fi
 
-BODY="$(jq -Rs --arg status "$PLAN_STATUS" --arg sha "$HEAD_SHA" '
-  "### ⚜️ tofu plan (via Devtron Job)\n\n" + $status + "\n\n" +
-  "<details><summary>Show plan output</summary>\n\n```diff\n" + . + "\n```\n</details>\n\n" +
+BODY="$(jq -Rs --arg header "$HEADER" --arg summary "$SUMMARY_LINE" \
+               --arg sha "$HEAD_SHA" '
+  $header + "\n\n" +
+  "<details><summary>Show Output</summary>\n\n```diff\n" + . + "\n```\n</details>\n\n" +
+  "**" + $summary + "**\n\n" +
   "_commit `" + (if ($sha|length)>0 then $sha[0:12] else "unknown" end) +
-  "` · plan-only, no apply — Atlantis-PoC_"
+  "` · plan-only, no apply — Atlantis-PoC (Devtron Job)_"
 ' <<EOF
-$PLAN_OUTPUT
+$DIFF_COLORED
 EOF
 )"
 
