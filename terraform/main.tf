@@ -21,6 +21,6 @@ resource "local_file" "demo" {
     Change this content (or add a resource) in a pull request, and the
     Devtron job will post the `tofu plan` diff as a comment on that PR.
 
-    revision = 4
+    revision = 5
   EOT
 }

@@ -105,18 +105,6 @@ SUMMARY_LINE="$(printf '%s\n' "$PLAN_OUTPUT" | grep -E '^(Plan:|No changes|Apply
 
 HEADER="Ran Plan for dir: \`$TF_DIR\` workspace: \`default\`"
 
-# (b) Atlantis look-alike command footer — shown for parity only.
-FOOTER="$(cat <<'EOFTR'
----
-* :arrow_forward: To **apply** all unapplied plans from this Pull Request, comment:
-  * `atlantis apply`
-* :repeat: To **plan** this project again, comment:
-  * `atlantis plan -d terraform`
-
-> ℹ️ _Command footer shown for parity with Atlantis — **not wired in this PoC**. The `apply` / comment-driven commands are out of scope; this Devtron Job only **plans**._
-EOFTR
-)"
-
 # Truncate defensively (GitHub caps comments at 65536 chars).
 MAX=60000
 if [ "$(printf %s "$DIFF_COLORED" | wc -c)" -gt "$MAX" ]; then
@@ -125,11 +113,10 @@ if [ "$(printf %s "$DIFF_COLORED" | wc -c)" -gt "$MAX" ]; then
 fi
 
 BODY="$(jq -Rs --arg header "$HEADER" --arg summary "$SUMMARY_LINE" \
-               --arg footer "$FOOTER" --arg sha "$HEAD_SHA" '
+               --arg sha "$HEAD_SHA" '
   $header + "\n\n" +
   "<details><summary>Show Output</summary>\n\n```diff\n" + . + "\n```\n</details>\n\n" +
   "**" + $summary + "**\n\n" +
-  $footer + "\n\n" +
   "_commit `" + (if ($sha|length)>0 then $sha[0:12] else "unknown" end) +
   "` · plan-only, no apply — Atlantis-PoC (Devtron Job)_"
 ' <<EOF
