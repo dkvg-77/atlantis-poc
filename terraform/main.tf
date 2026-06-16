@@ -27,7 +27,7 @@ resource "random_pet" "demo" {
 
   keepers = {
     # ---- Bump this in a PR to force a new pet ----
-    revision = "2"
+    revision = "5"
   }
 }
 
