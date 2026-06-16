@@ -1,26 +1,37 @@
 terraform {
   required_version = ">= 1.6"
+
+  # Remote state so plan/apply are consistent across runs (and across the
+  # plan-on-PR and apply-on-merge jobs). The Devtron job pod authenticates to
+  # GCS via Workload Identity (devtron-ci/ci-runner -> tofu-bootstrap GSA).
+  backend "gcs" {
+    bucket = "dev-infra-test-497417-tofu-state"
+    prefix = "atlantis-poc"
+  }
+
   required_providers {
-    local = {
-      source  = "hashicorp/local"
-      version = "~> 2.5"
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.6"
     }
   }
 }
 
-# A deliberately trivial, zero-cost, no-cloud resource.
-# Its only job is to produce a meaningful `tofu plan` diff when edited,
-# so we can demo the "plan-on-PR -> comment" flow without touching real infra.
-resource "local_file" "demo" {
-  filename = "${path.module}/demo-output.txt"
+# A deliberately trivial, zero-cost, no-cloud resource that lives entirely in
+# Terraform state (no external system), so the plan reflects real state:
+#   - unchanged PR     -> "No changes"
+#   - bump `revision`  -> plan shows replace (-/+); apply-on-merge applies it
+resource "random_pet" "demo" {
+  length    = 2
+  separator = "-"
 
-  # ---- Edit anything below in a PR to change the plan ----
-  content = <<-EOT
-    Atlantis-PoC demo file.
+  keepers = {
+    # ---- Bump this in a PR to force a new pet ----
+    revision = "1"
+  }
+}
 
-    Change this content (or add a resource) in a pull request, and the
-    Devtron job will post the `tofu plan` diff as a comment on that PR.
-
-    revision = 5
-  EOT
+output "demo_pet" {
+  description = "The generated pet name (changes only when revision changes)."
+  value       = random_pet.demo.id
 }
