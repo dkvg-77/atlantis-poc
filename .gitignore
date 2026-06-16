@@ -6,3 +6,6 @@
 crash.log
 # the demo output the local_file resource would write
 terraform/demo-output.txt
+
+# Claude Code session artifacts (never commit)
+.claude/
