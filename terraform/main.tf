@@ -1,37 +1,45 @@
 terraform {
   required_version = ">= 1.6"
 
-  # Remote state so plan/apply are consistent across runs (and across the
-  # plan-on-PR and apply-on-merge jobs). The Devtron job pod authenticates to
-  # GCS via Workload Identity (devtron-ci/ci-runner -> tofu-bootstrap GSA).
+  # Remote state in GCS; the Devtron job pod authenticates via Workload Identity
+  # (devtron-ci/ci-runner -> tofu-bootstrap GSA). State is consistent across the
+  # plan-on-PR and apply-on-merge jobs.
   backend "gcs" {
     bucket = "dev-infra-test-497417-tofu-state"
     prefix = "atlantis-poc"
   }
 
   required_providers {
-    random = {
-      source  = "hashicorp/random"
-      version = "~> 3.6"
+    google = {
+      source  = "hashicorp/google"
+      version = "~> 5.0"
     }
   }
 }
 
-# A deliberately trivial, zero-cost, no-cloud resource that lives entirely in
-# Terraform state (no external system), so the plan reflects real state:
-#   - unchanged PR     -> "No changes"
-#   - bump `revision`  -> plan shows replace (-/+); apply-on-merge applies it
-resource "random_pet" "demo" {
-  length    = 2
-  separator = "-"
+provider "google" {
+  project = "dev-infra-test-497417"
+  region  = "us-central1"
+}
 
-  keepers = {
-    # ---- Bump this in a PR to force a new pet ----
-    revision = "5"
+# A REAL, visible-in-the-Console demo resource: a GCS bucket.
+# - Open a PR that edits this -> plan-on-PR comments the diff.
+# - Merge -> apply-on-merge creates/changes it; see it in
+#   Cloud Console -> Cloud Storage.
+resource "google_storage_bucket" "demo" {
+  name                        = "dev-infra-test-497417-atlantis-poc-demo"
+  location                    = "US"
+  force_destroy               = true # lets a "destroy" PR remove it cleanly
+  uniform_bucket_level_access = true
+
+  labels = {
+    # ---- change this in a PR to see a "1 to change" diff in the Console ----
+    demo_revision = "1"
+    managed_by    = "atlantis-poc"
   }
 }
 
-output "demo_pet" {
-  description = "The generated pet name (changes only when revision changes)."
-  value       = random_pet.demo.id
+output "demo_bucket" {
+  description = "The demo bucket's URL (visible in Cloud Console)."
+  value       = google_storage_bucket.demo.url
 }
