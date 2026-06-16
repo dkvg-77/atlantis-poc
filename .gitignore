@@ -1,0 +1,8 @@
+# terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.lock.hcl
+crash.log
+# the demo output the local_file resource would write
+terraform/demo-output.txt
